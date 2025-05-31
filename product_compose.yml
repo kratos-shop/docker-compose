@@ -1,0 +1,191 @@
+# 第三代语法
+version: '3'                                                   # 指定使用docker-compose第3版本的语法
+
+# 自定义数据卷(服务数据持久化)，位于宿主机/var/lib/docker/volumes内
+volumes:                                                       # 定义持久化存储卷
+  databasedata:                                                # MySQL数据存储卷，用于持久化数据库数据
+  databaseconf:                                                # MySQL配置存储卷，用于持久化数据库配置
+  etcddata:                                                    # 添加etcd数据卷
+  natsdata:                                                     # 添加 NATS 数据卷
+  consuldata:                                                   # 添加 Consul 数据卷
+  kafkadata:                                                   # 添加 Kafka 数据卷
+  zookeeperdata:                                               # 添加 Zookeeper 数据卷
+  kafkamanagerdata:                                            # 添加 kafkamanagerdata 数据卷
+  redisdata:                                                   # 添加 redis 数据卷
+  grafanadata:                                                 # 添加 grafana 数据卷
+  prometheusdata:                                               # 添加 prometheus 数据卷
+  jaegerdata:                                                   # 添加 jaeger 数据卷
+
+services:                                                      # 定义服务列表
+  codemysql:                                                   # MySQL服务配置
+    build:                                                     # 构建配置
+      context: .                                               # 构建上下文为当前目录
+      dockerfile: compose/mysql/Dockerfile                      # 使用的Dockerfile路径
+    image: kratos_mysql                                        # 构建后的镜像名称
+    container_name: kratos_mysql                               # 容器名称
+    restart: always                                            # 容器总是自动重启
+    volumes:                                                   # 卷挂载配置
+      # 数据挂载
+      - databasedata:/var/lib/mysql/                           # 将数据卷挂载到容器的数据目录
+      # 配置挂载
+      - databaseconf:/etc/mysql/conf.d/                        # 将配置卷挂载到容器的配置目录
+    #env_file:                                                 # 环境变量文件（已注释）
+    #  - ./.envs/.production/.my
+    # 设置数据库密码、创建一个数据库
+    environment:                                               # 环境变量配置
+      # root 密码
+      - "MYSQL_ROOT_PASSWORD=Eisoo.com123"                     # 设置MySQL root用户密码
+    command: --init-file /docker-entrypoint-initdb.d/init.sql  # 启动命令，指定初始化SQL文件
+    ports:                                                     # 端口映射
+      - "3306:3306"                                           # 将容器的3306端口映射到主机的3306端口
+
+  codenginx:                                                   # Nginx服务配置
+    build:                                                     # 构建配置
+      context: .                                               # 构建上下文为当前目录
+      dockerfile: compose/nginx/Dockerfile                      # 使用的Dockerfile路径
+    image: kratos_nginx                                        # 构建后的镜像名称
+    container_name: kratos_nginx                               # 容器名称
+    restart: always                                            # 容器总是自动重启
+    # 暴露全端口
+    network_mode: host                                         # 使用主机网络模式，直接使用宿主机的网络
+
+  codeetcd:                                                    # etcd服务配置
+    build:
+      context: .
+      dockerfile: compose/etcd/Dockerfile
+    image: kratos_etcd
+    container_name: kratos_etcd
+    restart: always
+    volumes:
+      - etcddata:/bitnami/etcd                                # 数据持久化
+    ports:
+      - "2379:2379"                                           # 客户端通信端口
+      - "2380:2380"                                           # 集群通信端口
+    environment:
+      - ETCD_INITIAL_CLUSTER_STATE=new                        # 初始集群状态
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1            # 集群token
+
+  codenats:                                                     # NATS 服务配置
+    build:
+      context: .
+      dockerfile: compose/nats/Dockerfile
+    image: kratos_nats
+    container_name: kratos_nats
+    restart: always
+    volumes:
+      - natsdata:/data                                         # 数据持久化
+      - ./compose/nats/nats-server.conf:/etc/nats/nats-server.conf:ro  # 配置文件挂载
+    ports:
+      - "4222:4222"                                            # 客户端连接端口
+      - "8222:8222"                                            # HTTP 管理端口
+      - "6222:6222"                                            # 集群通信端口
+    ulimits:                                                   # 系统资源限制
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  codeconsul:                                                   # Consul 服务配置
+    build:
+      context: .
+      dockerfile: compose/consul/Dockerfile
+    image: kratos_consul
+    container_name: kratos_consul
+    restart: always
+    volumes:
+      - consuldata:/consul/data                                # 数据持久化
+      - ./compose/consul/config.json:/consul/config/config.json:ro  # 配置文件挂载
+    ports:
+      - "8500:8500"                                           # HTTP API & UI
+      - "8600:8600/tcp"                                       # DNS
+      - "8600:8600/udp"                                       # DNS
+      - "8300:8300"                                           # Server RPC
+      - "8301:8301"                                           # Serf LAN
+      - "8302:8302"                                           # Serf WAN
+    environment:
+      - CONSUL_ALLOW_PRIVILEGED_PORTS=true                    # 允许绑定特权端口
+    cap_add:
+      - NET_ADMIN                                             # 允许网络管理权限
+      - SYS_TIME                                              # 允许时间同步
+
+  codekafka:
+    build:
+      context: .
+      dockerfile: compose/kafka/Dockerfile
+    container_name: kratos_kafka
+    restart: always
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_RESOURCE
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      nproc:
+        soft: 4096
+        hard: 4096
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    volumes:
+      - kafkadata:/bitnami/kafka
+
+  codekafka-ui:
+    build:
+      context: .
+      dockerfile: compose/kafka-ui/Dockerfile
+    container_name: kratos_kafka_ui
+    restart: always
+    ports:
+      - "9999:8080"
+    depends_on:
+      - codekafka
+
+  coderedis:
+    build:
+      context: .
+      dockerfile: compose/redis/Dockerfile
+    container_name: kratos_redis
+    restart: always
+    user: "0:0"
+    privileged: true
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  codegrafana:
+    image: grafana/grafana:10.4.2
+    container_name: kratos_grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafanadata:/var/lib/grafana
+
+  codeprometheus:
+    image: registry.cn-hangzhou.aliyuncs.com/shihao-images/prometheus:3.3.1
+    container_name: kratos_prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheusdata:/prometheus
+      - ./compose/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  codejaeger:
+    image: registry.cn-hangzhou.aliyuncs.com/shihao-images/all-in-one:1.54
+    container_name: kratos_jaeger
+    restart: always
+    ports:
+      # Agent ports
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      # Collector ports
+      - "14268:14268"
+      - "14250:14250"
+      # Query/UI port
+      - "16686:16686"
+    volumes:
+      # 如果需要持久化数据，可以挂载数据卷
+      - jaegerdata:/badger
