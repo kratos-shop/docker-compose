@@ -15,4 +15,4 @@ ENV CANAL_SERVER_PORT=11111
 EXPOSE 11111
 
 # 启动命令
-CMD ["sh", "-c", "bin/startup.sh && tail -f logs/canal/canal.log"] 
+CMD ["sh", "-c", "rm -f /home/admin/canal-server/canal.pid && bin/startup.sh && tail -f logs/canal/canal.log"]
