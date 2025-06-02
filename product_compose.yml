@@ -190,19 +190,3 @@ services:                                                      # 定义服务列
     volumes:
       # 如果需要持久化数据，可以挂载数据卷
       - jaegerdata:/badger
-
-  codecanal:                                                   # Canal Server 服务配置
-    build:                                                     # 构建配置
-      context: .                                           # 构建上下文为当前目录
-      dockerfile: compose/canal/Dockerfile                     # 使用的Dockerfile路径
-    image: kratos_canal                                       # 构建后的镜像名称
-    container_name: kratos_canal                              # 容器名称
-    restart: always                                           # 容器总是自动重启
-    ports:
-      - "11111:11111"                                        # Canal Server 端口映射
-    volumes:
-      - canaldata:/home/admin/canal-server                    # 数据持久化
-    environment:
-      - canal.instance.master.address=host.docker.internal:3306  # MySQL 主库地址
-    extra_hosts:
-      - "host.docker.internal:host-gateway"                   # 添加 host.docker.internal 解析
