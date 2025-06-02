@@ -193,7 +193,7 @@ services:                                                      # 定义服务列
 
   codecanal:                                                   # Canal Server 服务配置
     build:                                                     # 构建配置
-      context: ./compose/canal                                            # 构建上下文为当前目录
+      context: .                                           # 构建上下文为当前目录
       dockerfile: compose/canal/Dockerfile                     # 使用的Dockerfile路径
     image: kratos_canal                                       # 构建后的镜像名称
     container_name: kratos_canal                              # 容器名称

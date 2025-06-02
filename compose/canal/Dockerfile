@@ -5,7 +5,7 @@ FROM crpi-uzef3wvj2h8rbxm9.cn-shanghai.personal.cr.aliyuncs.com/0602_study/canal
 WORKDIR /home/admin/canal-server
 
 # 复制配置文件
-COPY ./instance.properties /home/admin/canal-server/conf/example/instance.properties
+COPY ./compose/canal/instance.properties /home/admin/canal-server/conf/example/instance.properties
 
 # 设置环境变量
 ENV CANAL_SERVER_MODE=instance
